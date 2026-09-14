@@ -369,6 +369,17 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    // Privacy Mode State
+    private val _isPrivacyModeEnabled = MutableStateFlow(false)
+    val isPrivacyModeEnabled: StateFlow<Boolean> = _isPrivacyModeEnabled.asStateFlow()
+
+    fun togglePrivacyMode() {
+        _isPrivacyModeEnabled.value = !_isPrivacyModeEnabled.value
+    }
+
+    var recentlyDeletedTransaction: TransactionEntity? = null
+        private set
+
     fun updateTransaction(tx: TransactionEntity) {
         viewModelScope.launch {
             repository.updateTransaction(tx)
@@ -376,10 +387,56 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun deleteTransaction(tx: TransactionEntity) {
+    fun deleteTransaction(tx: TransactionEntity, onDeleted: (() -> Unit)? = null) {
         viewModelScope.launch {
+            recentlyDeletedTransaction = tx
             repository.deleteTransaction(tx)
             closeEditTransaction()
+            onDeleted?.invoke()
+        }
+    }
+
+    fun undoDeleteTransaction() {
+        val toRestore = recentlyDeletedTransaction ?: return
+        viewModelScope.launch {
+            repository.insertTransaction(toRestore)
+            recentlyDeletedTransaction = null
+        }
+    }
+
+    fun exportTransactionsToCsv(context: Context) {
+        val list = allTransactions.value
+        val csvBuilder = StringBuilder()
+        csvBuilder.appendLine("ID,Title,Type,Category,Amount,PaymentMethod,Date,Notes")
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        list.forEach { tx ->
+            val cleanTitle = tx.title.replace("\"", "\"\"")
+            val cleanCategory = tx.category.replace("\"", "\"\"")
+            val cleanPayment = tx.paymentMethod.replace("\"", "\"\"")
+            val cleanNotes = tx.notes.replace("\"", "\"\"")
+            val dateStr = dateFormat.format(Date(tx.dateMillis))
+            csvBuilder.appendLine("${tx.id},\"$cleanTitle\",${tx.type},\"$cleanCategory\",${tx.amount},\"$cleanPayment\",$dateStr,\"$cleanNotes\"")
+        }
+
+        try {
+            val sendIntent = Intent().apply {
+                action = Intent.ACTION_SEND
+                putExtra(Intent.EXTRA_TEXT, csvBuilder.toString())
+                putExtra(Intent.EXTRA_TITLE, "pocket_finance_transactions_${System.currentTimeMillis()}.csv")
+                type = "text/csv"
+            }
+            val shareIntent = Intent.createChooser(sendIntent, "Export Transactions CSV")
+            shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(shareIntent)
+        } catch (e: Exception) {
+            val fallbackIntent = Intent().apply {
+                action = Intent.ACTION_SEND
+                putExtra(Intent.EXTRA_TEXT, csvBuilder.toString())
+                type = "text/plain"
+            }
+            val chooser = Intent.createChooser(fallbackIntent, "Export Transactions")
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(chooser)
         }
     }
 

@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import com.example.data.model.TransactionType
 import com.example.ui.components.*
 import com.example.ui.screens.*
@@ -28,9 +29,12 @@ fun PocketFinanceApp(
     viewModel: FinanceViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
     val currency by viewModel.currencySymbol.collectAsStateWithLifecycle()
+    val isPrivacyMode by viewModel.isPrivacyModeEnabled.collectAsStateWithLifecycle()
     val lastCategory by viewModel.lastUsedCategory.collectAsStateWithLifecycle()
     val lastPayment by viewModel.lastUsedPaymentMethod.collectAsStateWithLifecycle()
 
@@ -61,6 +65,12 @@ fun PocketFinanceApp(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.testTag("app_snackbar_host")
+            )
+        },
         bottomBar = {
             PocketFinanceBottomNav(
                 currentTab = currentTab,
@@ -109,7 +119,20 @@ fun PocketFinanceApp(
                             onAddBill = { viewModel.openAddOrEditSubscription(null) },
                             onNavigateTab = { viewModel.selectTab(it) },
                             onTransactionClick = { viewModel.openEditTransaction(it) },
-                            onTransactionDelete = { viewModel.deleteTransaction(it) },
+                            onTransactionDelete = { tx ->
+                                viewModel.deleteTransaction(tx) {
+                                    scope.launch {
+                                        val result = snackbarHostState.showSnackbar(
+                                            message = "Deleted '${tx.title}'",
+                                            actionLabel = "UNDO",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                        if (result == SnackbarResult.ActionPerformed) {
+                                            viewModel.undoDeleteTransaction()
+                                        }
+                                    }
+                                }
+                            },
                             onMarkSubscriptionPaid = { viewModel.markSubscriptionPaid(it) },
                             onEditBudget = { cat, amt -> viewModel.openAddOrEditBudget(cat, amt) }
                         )
@@ -123,13 +146,29 @@ fun PocketFinanceApp(
                             filterCategory = filterCategory,
                             filterPaymentMethod = filterPayment,
                             currency = currency,
+                            isPrivacyMode = isPrivacyMode,
+                            onTogglePrivacyMode = { viewModel.togglePrivacyMode() },
+                            onExportCsv = { viewModel.exportTransactionsToCsv(context) },
                             onSearchChange = { viewModel.setSearchQuery(it) },
                             onFilterTypeChange = { viewModel.setFilterType(it) },
                             onFilterCategoryChange = { viewModel.setFilterCategory(it) },
                             onFilterPaymentMethodChange = { viewModel.setFilterPaymentMethod(it) },
                             onClearFilters = { viewModel.clearFilters() },
                             onTransactionClick = { viewModel.openEditTransaction(it) },
-                            onTransactionDelete = { viewModel.deleteTransaction(it) },
+                            onTransactionDelete = { tx ->
+                                viewModel.deleteTransaction(tx) {
+                                    scope.launch {
+                                        val result = snackbarHostState.showSnackbar(
+                                            message = "Deleted '${tx.title}'",
+                                            actionLabel = "UNDO",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                        if (result == SnackbarResult.ActionPerformed) {
+                                            viewModel.undoDeleteTransaction()
+                                        }
+                                    }
+                                }
+                            },
                             onAddTransactionClick = { viewModel.openAddExpenseScreen() }
                         )
                     }
@@ -165,6 +204,9 @@ fun PocketFinanceApp(
                             summary = summary,
                             categoryBreakdown = categoryBreakdown,
                             currency = currency,
+                            isPrivacyMode = isPrivacyMode,
+                            onTogglePrivacyMode = { viewModel.togglePrivacyMode() },
+                            onExportCsv = { viewModel.exportTransactionsToCsv(context) },
                             onSelectCurrency = { viewModel.setCurrency(it) },
                             onViewReport = { isReportDialogOpen = true },
                             onShareReport = { viewModel.shareMonthlyReport(context) },

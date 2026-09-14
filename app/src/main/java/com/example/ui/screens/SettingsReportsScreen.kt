@@ -36,7 +36,10 @@ fun SettingsReportsScreen(
     onResetSampleData: () -> Unit,
     onClearAllData: () -> Unit,
     onSetOverallBudget: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isPrivacyMode: Boolean = false,
+    onTogglePrivacyMode: () -> Unit = {},
+    onExportCsv: () -> Unit = {}
 ) {
     var showClearConfirmDialog by remember { mutableStateOf(false) }
     var showResetConfirmDialog by remember { mutableStateOf(false) }
@@ -281,6 +284,64 @@ fun SettingsReportsScreen(
             }
         }
 
+        // Privacy & Security Section
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("privacy_settings_card"),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (isPrivacyMode) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "Privacy Mode",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Mask sensitive financial amounts in lists and reports",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Switch(
+                        checked = isPrivacyMode,
+                        onCheckedChange = { onTogglePrivacyMode() },
+                        modifier = Modifier.testTag("privacy_mode_switch")
+                    )
+                }
+            }
+        }
+
         // Data Management Section
         item {
             Card(
@@ -297,6 +358,15 @@ fun SettingsReportsScreen(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
+
+                    SettingsRow(
+                        icon = Icons.Default.FileDownload,
+                        title = "Export to CSV",
+                        subtitle = "Export transaction history for spreadsheets and backup",
+                        onClick = onExportCsv
+                    )
+
+                    HorizontalDivider()
 
                     SettingsRow(
                         icon = Icons.Default.Refresh,

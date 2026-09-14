@@ -45,10 +45,16 @@ fun TransactionsScreen(
     onTransactionClick: (TransactionEntity) -> Unit,
     onTransactionDelete: (TransactionEntity) -> Unit,
     onAddTransactionClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isPrivacyMode: Boolean = false,
+    onTogglePrivacyMode: () -> Unit = {},
+    onExportCsv: () -> Unit = {}
 ) {
     var showCategoryMenu by remember { mutableStateOf(false) }
     var showPaymentMenu by remember { mutableStateOf(false) }
+    var transactionToDelete by remember { mutableStateOf<TransactionEntity?>(null) }
+
+    val isFilterActive = searchQuery.isNotEmpty() || filterType != null || filterCategory != null || filterPaymentMethod != null
 
     val totalIncome = transactions.filter { it.type.equals("INCOME", ignoreCase = true) }.sumOf { it.amount }
     val totalExpense = transactions.filter { it.type.equals("EXPENSE", ignoreCase = true) }.sumOf { it.amount }
@@ -68,6 +74,54 @@ fun TransactionsScreen(
         }
     }
 
+    // Deletion Confirmation Dialog
+    if (transactionToDelete != null) {
+        val tx = transactionToDelete!!
+        AlertDialog(
+            onDismissRequest = { transactionToDelete = null },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.DeleteOutline,
+                    contentDescription = null,
+                    tint = CoralExpense,
+                    modifier = Modifier.size(28.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Delete Transaction",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "Are you sure you want to delete '${tx.title}' (${currency}${FinanceViewModel.formatAmount(tx.amount)})?\n\nYou will have an option to undo immediately."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val item = tx
+                        transactionToDelete = null
+                        onTransactionDelete(item)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = CoralExpense),
+                    modifier = Modifier.testTag("confirm_delete_button")
+                ) {
+                    Text("Delete", color = Color.White)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { transactionToDelete = null },
+                    modifier = Modifier.testTag("cancel_delete_button")
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -82,7 +136,7 @@ fun TransactionsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Transactions History",
                         style = MaterialTheme.typography.headlineSmall,
@@ -96,14 +150,45 @@ fun TransactionsScreen(
                     )
                 }
 
-                FilledTonalButton(
-                    onClick = onAddTransactionClick,
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Add Entry")
+                    // Privacy Toggle
+                    IconButton(
+                        onClick = onTogglePrivacyMode,
+                        modifier = Modifier.testTag("toggle_privacy_mode_button")
+                    ) {
+                        Icon(
+                            imageVector = if (isPrivacyMode) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = if (isPrivacyMode) "Show amounts" else "Hide amounts",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    // Export CSV
+                    IconButton(
+                        onClick = onExportCsv,
+                        modifier = Modifier.testTag("export_csv_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FileDownload,
+                            contentDescription = "Export CSV",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    // Add Entry
+                    FilledTonalButton(
+                        onClick = onAddTransactionClick,
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.testTag("add_transaction_header_button")
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Add Entry")
+                    }
                 }
             }
         }
@@ -149,7 +234,8 @@ fun TransactionsScreen(
                 FilterChip(
                     selected = filterType == null,
                     onClick = { onFilterTypeChange(null) },
-                    label = { Text("All Types") }
+                    label = { Text("All Types") },
+                    modifier = Modifier.testTag("filter_all_types")
                 )
                 FilterChip(
                     selected = filterType == TransactionType.EXPENSE,
@@ -164,7 +250,8 @@ fun TransactionsScreen(
                                 .clip(CircleShape)
                                 .background(CoralExpense)
                         )
-                    }
+                    },
+                    modifier = Modifier.testTag("filter_expenses_only")
                 )
                 FilterChip(
                     selected = filterType == TransactionType.INCOME,
@@ -179,7 +266,8 @@ fun TransactionsScreen(
                                 .clip(CircleShape)
                                 .background(EmeraldPrimary)
                         )
-                    }
+                    },
+                    modifier = Modifier.testTag("filter_income_only")
                 )
 
                 // Category Filter Dropdown
@@ -196,7 +284,8 @@ fun TransactionsScreen(
                         },
                         colors = AssistChipDefaults.assistChipColors(
                             containerColor = if (filterCategory != null) EmeraldContainer else MaterialTheme.colorScheme.surface
-                        )
+                        ),
+                        modifier = Modifier.testTag("filter_category_chip")
                     )
 
                     DropdownMenu(
@@ -236,7 +325,8 @@ fun TransactionsScreen(
                         },
                         colors = AssistChipDefaults.assistChipColors(
                             containerColor = if (filterPaymentMethod != null) IndigoSubscriptionContainer else MaterialTheme.colorScheme.surface
-                        )
+                        ),
+                        modifier = Modifier.testTag("filter_payment_chip")
                     )
 
                     DropdownMenu(
@@ -262,8 +352,11 @@ fun TransactionsScreen(
                     }
                 }
 
-                if (filterType != null || filterCategory != null || filterPaymentMethod != null || searchQuery.isNotEmpty()) {
-                    TextButton(onClick = onClearFilters) {
+                if (isFilterActive) {
+                    TextButton(
+                        onClick = onClearFilters,
+                        modifier = Modifier.testTag("reset_filters_chip")
+                    ) {
                         Text("Reset", color = CoralExpense)
                     }
                 }
@@ -289,7 +382,12 @@ fun TransactionsScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text("Income:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("+$currency${FinanceViewModel.formatAmount(totalIncome)}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MintIncome)
+                        Text(
+                            text = if (isPrivacyMode) "••••" else "+$currency${FinanceViewModel.formatAmount(totalIncome)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MintIncome
+                        )
                     }
 
                     Row(
@@ -297,51 +395,109 @@ fun TransactionsScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text("Expenses:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("-$currency${FinanceViewModel.formatAmount(totalExpense)}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = CoralExpense)
+                        Text(
+                            text = if (isPrivacyMode) "••••" else "-$currency${FinanceViewModel.formatAmount(totalExpense)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = CoralExpense
+                        )
                     }
                 }
             }
         }
 
-        // Grouped List of Transactions
+        // Grouped List of Transactions or Empty States
         if (groupedTransactions.isEmpty()) {
             item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 20.dp),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
-                    Column(
+                if (isFilterActive) {
+                    // Filtered empty state
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                            .padding(top = 20.dp)
+                            .testTag("filtered_empty_state_card"),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.SearchOff,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                            modifier = Modifier.size(48.dp)
-                        )
-                        Text(
-                            text = "No matching transactions",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Try adjusting your search query or filters",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Button(
-                            onClick = onClearFilters,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.padding(top = 8.dp)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Text("Clear All Filters")
+                            Icon(
+                                imageVector = Icons.Default.SearchOff,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Text(
+                                text = "No matching transactions",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Try adjusting your search query, category, or filters",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Button(
+                                onClick = onClearFilters,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .padding(top = 8.dp)
+                                    .testTag("clear_all_filters_button")
+                            ) {
+                                Text("Clear All Filters")
+                            }
+                        }
+                    }
+                } else {
+                    // Database empty state
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 20.dp)
+                            .testTag("db_empty_state_card"),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ReceiptLong,
+                                contentDescription = null,
+                                tint = EmeraldPrimary,
+                                modifier = Modifier.size(52.dp)
+                            )
+                            Text(
+                                text = "No Transactions Yet",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Start tracking your spending and income by adding your first transaction.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Button(
+                                onClick = onAddTransactionClick,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                                modifier = Modifier
+                                    .padding(top = 8.dp)
+                                    .testTag("add_first_expense_button")
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Add Your First Expense")
+                            }
                         }
                     }
                 }
@@ -366,7 +522,7 @@ fun TransactionsScreen(
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = if (groupExpenseTotal > 0) "-$currency${FinanceViewModel.formatAmount(groupExpenseTotal)}"
+                            text = if (isPrivacyMode) "••••" else if (groupExpenseTotal > 0) "-$currency${FinanceViewModel.formatAmount(groupExpenseTotal)}"
                             else "+$currency${FinanceViewModel.formatAmount(groupIncomeTotal)}",
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.SemiBold,
@@ -380,7 +536,8 @@ fun TransactionsScreen(
                         transaction = tx,
                         currency = currency,
                         onClick = { onTransactionClick(tx) },
-                        onDelete = { onTransactionDelete(tx) }
+                        onDelete = { transactionToDelete = tx },
+                        isPrivacyMode = isPrivacyMode
                     )
                 }
             }

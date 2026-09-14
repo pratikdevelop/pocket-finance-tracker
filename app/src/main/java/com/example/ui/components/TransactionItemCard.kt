@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,7 +31,8 @@ fun TransactionItemCard(
     currency: String,
     onClick: () -> Unit,
     onDelete: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isPrivacyMode: Boolean = false
 ) {
     val isIncome = transaction.type.equals("INCOME", ignoreCase = true)
     val categoryColor = CategoryIconHelper.getColorForCategory(transaction.category)
@@ -63,12 +65,13 @@ fun TransactionItemCard(
                 modifier = Modifier
                     .size(46.dp)
                     .clip(CircleShape)
-                    .background(categoryColor.copy(alpha = 0.15f)),
+                    .background(categoryColor.copy(alpha = 0.15f))
+                    .testTag("transaction_category_icon_${transaction.id}"),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
-                    contentDescription = transaction.category,
+                    contentDescription = "${transaction.category} icon",
                     tint = categoryColor,
                     modifier = Modifier.size(24.dp)
                 )
@@ -143,10 +146,11 @@ fun TransactionItemCard(
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
-                    text = "${if (isIncome) "+" else "-"}$currency${FinanceViewModel.formatAmount(transaction.amount)}",
+                    text = if (isPrivacyMode) "••••" else "${if (isIncome) "+" else "-"}$currency${FinanceViewModel.formatAmount(transaction.amount)}",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = if (isIncome) MintIncome else CoralExpense
+                    color = if (isIncome) MintIncome else CoralExpense,
+                    modifier = Modifier.testTag("transaction_amount_${transaction.id}")
                 )
 
                 Text(
@@ -160,13 +164,15 @@ fun TransactionItemCard(
             Box {
                 IconButton(
                     onClick = { showMenu = true },
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier
+                        .size(36.dp)
+                        .testTag("transaction_options_btn_${transaction.id}")
                 ) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
-                        contentDescription = "Options",
+                        contentDescription = "Options for ${transaction.title}",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
 
@@ -176,6 +182,13 @@ fun TransactionItemCard(
                 ) {
                     DropdownMenuItem(
                         text = { Text("Edit") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        },
                         onClick = {
                             showMenu = false
                             onClick()
@@ -187,9 +200,11 @@ fun TransactionItemCard(
                             Icon(
                                 imageVector = Icons.Default.DeleteOutline,
                                 contentDescription = "Delete",
-                                tint = CoralExpense
+                                tint = CoralExpense,
+                                modifier = Modifier.size(18.dp)
                             )
                         },
+                        modifier = Modifier.testTag("transaction_delete_menu_item_${transaction.id}"),
                         onClick = {
                             showMenu = false
                             onDelete()
