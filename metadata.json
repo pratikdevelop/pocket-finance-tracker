@@ -1,0 +1,6 @@
+{
+  "name": "Pocket Finance",
+  "description": "Smart expense and budget tracker with quick entry, bill reminders, subscriptions, and financial reports",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
